@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cardshop.internal/schemas/aqx-catalog.schema.json",
+  "title": "AQX Component Catalog",
+  "description": "Machine-readable catalog of the aqx component library. Grounds the page generator (#4) and the Figma->aqx mapping (#2b) so they compose REAL components with REAL props instead of hallucinating. The catalog is the contract; generation quality is capped by its completeness.",
+  "type": "object",
+  "required": ["version", "library", "components"],
+  "properties": {
+    "version": { "type": "string", "examples": ["1.0.0"] },
+    "library": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "importPath"],
+      "properties": {
+        "name": { "type": "string", "examples": ["@amex/aqx"] },
+        "importPath": { "type": "string", "examples": ["@amex/aqx"] },
+        "docsUrl": { "type": "string", "format": "uri" }
+      }
+    },
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/component" }
+    }
+  },
+  "$defs": {
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "category", "description", "props", "examples"],
+      "properties": {
+        "name": { "type": "string", "examples": ["CardTile", "BenefitsList"] },
+        "category": {
+          "type": "string",
+          "enum": ["layout", "card", "navigation", "content", "form", "feedback", "media"]
+        },
+        "description": {
+          "type": "string",
+          "description": "What it is and when to use it. The generator reads this to pick the right component."
+        },
+        "figmaComponentNames": {
+          "type": "array",
+          "description": "Figma component names that map to this aqx component. Powers Figma->aqx (#2b) and the validator (#3).",
+          "items": { "type": "string" },
+          "examples": [["Card / Tile", "CardTile"]]
+        },
+        "props": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/prop" }
+        },
+        "a11y": {
+          "type": "array",
+          "description": "Accessibility requirements the generator must honor.",
+          "items": { "type": "string" }
+        },
+        "doNot": {
+          "type": "array",
+          "description": "Anti-patterns. Prevents the generator from misusing the component.",
+          "items": { "type": "string" }
+        },
+        "examples": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["title", "code"],
+            "properties": {
+              "title": { "type": "string" },
+              "code": { "type": "string", "description": "Copy-pasteable usage snippet." }
+            }
+          }
+        }
+      }
+    },
+    "prop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type", "required"],
+      "properties": {
+        "name": { "type": "string" },
+        "type": {
+          "type": "string",
+          "description": "TS-style type. Use a union for enumerable values.",
+          "examples": ["string", "'sm' | 'md' | 'lg'", "boolean", "CardData"]
+        },
+        "required": { "type": "boolean" },
+        "default": { "type": ["string", "number", "boolean", "null"] },
+        "description": { "type": "string" },
+        "enumValues": {
+          "type": "array",
+          "description": "Allowed values when type is a union. Generator must only emit these.",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

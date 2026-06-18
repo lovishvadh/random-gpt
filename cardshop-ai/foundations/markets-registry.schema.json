@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cardshop.internal/schemas/markets-registry.schema.json",
+  "title": "Cardshop Markets Registry",
+  "description": "Single source of truth for per-market operational data. This file is read by the knowledge GPT (#1) and the page generator (#4) instead of being memorized by an LLM, so answers never go stale. Update via PR; validate in CI.",
+  "type": "object",
+  "required": ["version", "updatedAt", "markets"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Semver of the registry shape. Bump on breaking changes.",
+      "examples": ["1.0.0"]
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last update timestamp (set by CI on merge)."
+    },
+    "markets": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/market" }
+    }
+  },
+  "$defs": {
+    "market": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "name",
+        "status",
+        "cpCode",
+        "urls",
+        "backend",
+        "repositories",
+        "escalation",
+        "activeCards"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "ISO-style market code.",
+          "pattern": "^[A-Z]{2}$",
+          "examples": ["AU", "US", "UK"]
+        },
+        "name": { "type": "string", "examples": ["Australia"] },
+        "status": {
+          "type": "string",
+          "enum": ["live", "pre-launch", "sunset", "paused"]
+        },
+        "cpCode": {
+          "type": "string",
+          "description": "Akamai/CDN content provider (CP) code for this market.",
+          "examples": ["123456"]
+        },
+        "urls": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["production"],
+          "properties": {
+            "production": { "type": "string", "format": "uri" },
+            "staging": { "type": "string", "format": "uri" },
+            "cardshopBasePath": {
+              "type": "string",
+              "description": "Path segment for Cardshop pages, e.g. /credit-cards.",
+              "examples": ["/credit-cards"]
+            }
+          }
+        },
+        "backend": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["service", "dataFlow"],
+          "properties": {
+            "service": {
+              "type": "string",
+              "description": "Primary backend/BFF this market's pages call.",
+              "examples": ["cardshop-bff-apac"]
+            },
+            "contentSource": {
+              "type": "string",
+              "description": "CMS or content origin for card data.",
+              "examples": ["aem-apac"]
+            },
+            "dataFlow": {
+              "type": "string",
+              "description": "One-line plain-English summary of how data reaches the page. The GPT cites this verbatim.",
+              "examples": [
+                "AEM content -> cardshop-bff-apac -> cardshop-web (SSR) -> Akamai edge cache"
+              ]
+            }
+          }
+        },
+        "repositories": {
+          "type": "array",
+          "description": "Repos that power this market, tagged by layer.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "layer", "url"],
+            "properties": {
+              "name": { "type": "string", "examples": ["cardshop-web"] },
+              "layer": {
+                "type": "string",
+                "enum": ["frontend", "bff", "backend", "content", "infra"]
+              },
+              "url": { "type": "string", "format": "uri" }
+            }
+          }
+        },
+        "escalation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["primaryChannel"],
+          "properties": {
+            "primaryChannel": {
+              "type": "string",
+              "description": "Where to report an error on this market's pages.",
+              "examples": ["#cardshop-apac-support"]
+            },
+            "onCall": { "type": "string", "examples": ["PagerDuty: cardshop-apac"] },
+            "runbookUrl": { "type": "string", "format": "uri" }
+          }
+        },
+        "operations": {
+          "type": "object",
+          "description": "Pointers to how-to docs. The GPT links these rather than reciting steps from memory.",
+          "additionalProperties": false,
+          "properties": {
+            "akamaiCacheClearRunbook": { "type": "string", "format": "uri" },
+            "akamaiCpCodeForPurge": {
+              "type": "string",
+              "description": "CP code used when purging cache for this market.",
+              "examples": ["123456"]
+            }
+          }
+        },
+        "activeCards": {
+          "type": "array",
+          "description": "Cards currently live in this market. THIS is what answers 'what cards are active in AU'. Kept current via PR/CI sync.",
+          "items": { "$ref": "#/$defs/card" }
+        }
+      }
+    },
+    "card": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "status", "productType", "pageUrl"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable card/product identifier (SKU).",
+          "examples": ["AU-PLAT-CHARGE"]
+        },
+        "name": { "type": "string", "examples": ["The Platinum Card"] },
+        "status": {
+          "type": "string",
+          "enum": ["active", "coming-soon", "retired", "hidden"]
+        },
+        "productType": {
+          "type": "string",
+          "enum": ["charge", "credit", "co-brand", "business", "prepaid"]
+        },
+        "pageUrl": { "type": "string", "format": "uri" },
+        "figmaNodeId": {
+          "type": "string",
+          "description": "Optional link to this card's Figma frame. Feeds the validator (#3) and content extraction (#2).",
+          "examples": ["1234:5678"]
+        }
+      }
+    }
+  }
+}

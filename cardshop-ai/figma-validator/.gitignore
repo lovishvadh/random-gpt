@@ -1,0 +1,8 @@
+node_modules/
+.env
+report.html
+report.json
+bundle/
+fixtures/output/
+.playwright/
+*.log

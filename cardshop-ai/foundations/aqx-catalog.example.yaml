@@ -1,0 +1,98 @@
+# AQX Component Catalog — EXAMPLE (validates against aqx-catalog.schema.json)
+# Generated/maintained from the aqx source (ideal: auto-extracted from prop types + stories).
+# The richer this file, the better #4 (page generator) and #2b (Figma->aqx) perform.
+version: "1.0.0"
+library:
+  name: "@amex/aqx"
+  importPath: "@amex/aqx"
+  docsUrl: "https://confluence.example.com/aqx/components"
+
+components:
+  - name: PageShell
+    category: layout
+    description: "Top-level Cardshop page wrapper. Provides market theming, header, footer, and breadcrumb slots. Every generated page starts here."
+    figmaComponentNames: ["Page / Shell"]
+    props:
+      - name: market
+        type: string
+        required: true
+        description: "Market code (AU, US...). Pulled from the markets registry, not guessed."
+      - name: breadcrumbs
+        type: "BreadcrumbItem[]"
+        required: false
+    a11y:
+      - "Renders a single <main> landmark; do not nest another."
+    examples:
+      - title: "AU page shell"
+        code: |
+          <PageShell market="AU" breadcrumbs={[{label: 'Credit Cards', href: '/credit-cards'}]}>
+            {children}
+          </PageShell>
+
+  - name: CardHero
+    category: card
+    description: "Hero banner for a single card detail page: card art, name, headline, primary CTA."
+    figmaComponentNames: ["Card / Hero", "CardHero"]
+    props:
+      - name: cardName
+        type: string
+        required: true
+      - name: imageUrl
+        type: string
+        required: true
+      - name: ctaLabel
+        type: string
+        required: true
+        description: "Compliance-reviewed copy. Generator must flag for legal sign-off."
+      - name: variant
+        type: "'standard' | 'premium' | 'co-brand'"
+        required: false
+        default: "standard"
+        enumValues: ["standard", "premium", "co-brand"]
+    a11y:
+      - "imageUrl requires meaningful alt text via the cardName."
+      - "CTA must be a real button/link, focusable and keyboard-activatable."
+    doNot:
+      - "Do not hardcode APR or fees in the headline — use BenefitsList/disclosures."
+    examples:
+      - title: "Platinum hero"
+        code: |
+          <CardHero cardName="The Platinum Card" imageUrl="/img/au/plat.png"
+                    ctaLabel="Apply now" variant="premium" />
+
+  - name: BenefitsList
+    category: content
+    description: "Structured list of card benefits. Content sourced from CMS/Figma content JSON, never inlined by the generator."
+    figmaComponentNames: ["Benefits / List", "BenefitsList"]
+    props:
+      - name: items
+        type: "BenefitItem[]"
+        required: true
+        description: "Each item: { icon, title, description }."
+      - name: columns
+        type: "1 | 2 | 3"
+        required: false
+        default: 1
+        enumValues: ["1", "2", "3"]
+    a11y:
+      - "Renders as a <ul>; icons are decorative (aria-hidden)."
+    examples:
+      - title: "Two-column benefits"
+        code: |
+          <BenefitsList columns={2} items={benefits} />
+
+  - name: DisclosureBlock
+    category: content
+    description: "Legal/disclosure text region (rates, fees, terms). REQUIRED on every card page. Content is compliance-owned."
+    figmaComponentNames: ["Disclosure", "Legal / Block"]
+    props:
+      - name: content
+        type: string
+        required: true
+        description: "Approved disclosure copy from CMS. Generator must NOT author this."
+    doNot:
+      - "Never generate, summarize, or paraphrase disclosure text."
+    examples:
+      - title: "Disclosure"
+        code: |
+          <DisclosureBlock content={disclosures.platinum} />

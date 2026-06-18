@@ -1,0 +1,55 @@
+# Cardshop Markets Registry — EXAMPLE (validates against markets-registry.schema.json)
+# This is the single source of truth the knowledge GPT (#1) and page generator (#4) read.
+# Rule of thumb: if an LLM might get it wrong or stale, it belongs HERE, not in a prompt.
+version: "1.0.0"
+updatedAt: "2026-06-19T00:00:00Z"
+
+markets:
+  - code: AU
+    name: Australia
+    status: live
+    cpCode: "123456"
+    urls:
+      production: "https://www.americanexpress.com/au"
+      staging: "https://stage.americanexpress.com/au"
+      cardshopBasePath: "/credit-cards"
+    backend:
+      service: cardshop-bff-apac
+      contentSource: aem-apac
+      # Plain-English; the GPT cites this verbatim when asked "what is the data flow for AU?"
+      dataFlow: "AEM (aem-apac) -> cardshop-bff-apac -> cardshop-web (SSR) -> Akamai edge cache"
+    repositories:
+      - name: cardshop-web
+        layer: frontend
+        url: "https://github.example.com/cardshop/cardshop-web"
+      - name: cardshop-bff-apac
+        layer: bff
+        url: "https://github.example.com/cardshop/cardshop-bff-apac"
+      - name: cardshop-content-apac
+        layer: content
+        url: "https://github.example.com/cardshop/cardshop-content-apac"
+    escalation:
+      primaryChannel: "#cardshop-apac-support"   # answers "which channel for an error on this page"
+      onCall: "PagerDuty: cardshop-apac"
+      runbookUrl: "https://confluence.example.com/cardshop/apac-runbook"
+    operations:
+      akamaiCacheClearRunbook: "https://confluence.example.com/cardshop/akamai-purge"
+      akamaiCpCodeForPurge: "123456"
+    activeCards:
+      - id: AU-PLAT-CHARGE
+        name: "The Platinum Card"
+        status: active
+        productType: charge
+        pageUrl: "https://www.americanexpress.com/au/credit-cards/platinum-card"
+        figmaNodeId: "1234:5678"
+      - id: AU-EXPLORER
+        name: "Explorer Credit Card"
+        status: active
+        productType: credit
+        pageUrl: "https://www.americanexpress.com/au/credit-cards/explorer"
+        figmaNodeId: "1234:9012"
+      - id: AU-QANTAS-ULTIMATE
+        name: "Qantas Ultimate Card"
+        status: coming-soon
+        productType: co-brand
+        pageUrl: "https://www.americanexpress.com/au/credit-cards/qantas-ultimate"
