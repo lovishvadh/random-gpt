@@ -1,8 +1,10 @@
 node_modules/
 .env
-report.html
-report.json
-bundle/
-fixtures/output/
-.playwright/
 *.log
+dom-snapshot.json
+
+# Generated validator outputs
+cardshop-ai/figma-validator/report.html
+cardshop-ai/figma-validator/report.json
+cardshop-ai/figma-validator/bundle/
+cardshop-ai/figma-validator/fixtures/output/

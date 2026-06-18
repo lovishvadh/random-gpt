@@ -1,17 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { comparePairs } from "../src/comparator.js";
-import { scrapeDomElements } from "../src/domScraper.js";
+import { loadDomFile } from "../src/loadDomFile.js";
 import { matchElements } from "../src/matcher.js";
-import { buildReport, renderHtmlReport } from "../src/reporter.js";
-import { writeBundle } from "../src/reviewBundle.js";
+import { buildReport } from "../src/reporter.js";
+import { writeBundle, generateReviewMarkdown } from "../src/reviewBundle.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const fixtureHtml = join(__dirname, "..", "fixtures", "sample-page.html");
-const fixtureUrl = `file://${fixtureHtml}`;
+const sampleDomPath = join(__dirname, "..", "fixtures", "sample-dom.json");
 
 /** @type {import('../src/types.js').FigmaElement[]} */
 const mockFigmaElements = [
@@ -69,47 +68,21 @@ const mockFigmaElements = [
   },
 ];
 
-test("integration: fixture page produces pass, warn, and fail in report", async () => {
-  const domElements = await scrapeDomElements(fixtureUrl, { viewportWidth: 1440 });
+test("integration: dom-file bundle produces valid artifacts", async () => {
+  const domElements = await loadDomFile(sampleDomPath);
   assert.ok(domElements.length >= 3);
 
   const pairs = matchElements(mockFigmaElements, domElements);
   const results = comparePairs(pairs);
   const report = buildReport(results, {
     figmaLink: "https://www.figma.com/design/fixture/Card?node-id=1-1",
-    pageUrl: fixtureUrl,
+    pageUrl: "https://example.com/card",
     fileKey: "fixture",
     nodeId: "1:1",
   });
 
-  assert.ok(report.summary.pass >= 1, "expected at least one pass");
-  assert.ok(report.summary.fail >= 1, "expected at least one fail for missing Figma text");
-  assert.equal(report.summary.total, mockFigmaElements.length);
-
-  const outDir = join(__dirname, "..", "fixtures", "output");
-  await mkdir(outDir, { recursive: true });
-
-  const htmlPath = join(outDir, "report.html");
-  const jsonPath = join(outDir, "report.json");
-
-  await writeFile(htmlPath, renderHtmlReport(report), "utf8");
-  await writeFile(jsonPath, JSON.stringify(report, null, 2), "utf8");
-
-  const json = JSON.parse(await readFile(jsonPath, "utf8"));
-  assert.equal(json.summary.total, 4);
-  assert.ok(json.results.some((r) => r.status === "fail"));
-});
-
-test("integration: bundle mode writes four valid artifacts", async () => {
-  const domElements = await scrapeDomElements(fixtureUrl, { viewportWidth: 1440 });
-  const pairs = matchElements(mockFigmaElements, domElements);
-  const results = comparePairs(pairs);
-  const report = buildReport(results, {
-    figmaLink: "https://www.figma.com/design/fixture/Card?node-id=1-1",
-    pageUrl: fixtureUrl,
-    fileKey: "fixture",
-    nodeId: "1:1",
-  });
+  assert.ok(report.summary.pass >= 1);
+  assert.ok(report.summary.fail >= 1);
 
   const bundleDir = join(__dirname, "..", "fixtures", "output", "bundle");
   await mkdir(bundleDir, { recursive: true });
@@ -117,15 +90,16 @@ test("integration: bundle mode writes four valid artifacts", async () => {
   const paths = await writeBundle(bundleDir, {
     meta: {
       figmaLink: "https://www.figma.com/design/fixture/Card?node-id=1-1",
-      pageUrl: fixtureUrl,
+      pageUrl: "https://example.com/card",
       fileKey: "fixture",
       nodeId: "1:1",
-      viewportWidth: 1440,
+      frameWidth: 1440,
     },
     figmaElements: mockFigmaElements,
     domElements,
     naiveFindings: report,
     bundleDir,
+    hasDomFile: true,
   });
 
   const review = await readFile(paths.reviewPath, "utf8");
@@ -133,10 +107,36 @@ test("integration: bundle mode writes four valid artifacts", async () => {
   const domJson = JSON.parse(await readFile(paths.domPath, "utf8"));
   const naiveJson = JSON.parse(await readFile(paths.naivePath, "utf8"));
 
-  assert.ok(review.includes("Agent Review Task"));
+  assert.ok(review.includes("dom-snapshot.json"));
+  assert.ok(review.includes("naive-findings.json"));
   assert.equal(figmaJson.count, mockFigmaElements.length);
-  assert.ok(domJson.count >= 3);
+  assert.equal(domJson.count, domElements.length);
   assert.equal(naiveJson.summary.total, 4);
-  assert.ok(domElements[0].selector);
-  assert.ok(domElements[0].sectionContext);
+});
+
+test("generateReviewMarkdown without dom file instructs Copilot to fetch page", () => {
+  const md = generateReviewMarkdown({
+    meta: {
+      figmaLink: "https://figma.com/design/x",
+      pageUrl: "https://example.com/card",
+      fileKey: "x",
+      nodeId: "1:1",
+      frameWidth: 1440,
+    },
+    figmaElements: mockFigmaElements,
+    domElements: [],
+    naiveFindings: {
+      generatedAt: new Date().toISOString(),
+      meta: { figmaLink: "", pageUrl: "", fileKey: "", nodeId: "" },
+      summary: { total: 0, pass: 0, warn: 0, fail: 0 },
+      results: [],
+    },
+    bundleDir: "/tmp/bundle",
+    hasDomFile: false,
+  });
+
+  assert.ok(md.includes("Copilot must fetch the page URL"));
+  assert.ok(md.includes("fetch** tool"));
+  assert.ok(md.includes("figma-snapshot.json"));
+  assert.ok(!md.includes("naive-findings.json"));
 });

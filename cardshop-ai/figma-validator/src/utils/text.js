@@ -21,17 +21,17 @@ export function isMeaningfulText(text) {
 }
 
 /**
- * @param {Record<string, string>} args
+ * @param {string[]} args
  */
 export function parseArgs(args) {
   const result = {
     figma: "",
     token: process.env.FIGMA_TOKEN || "",
     url: "",
-    waitSelector: "",
-    viewportWidth: null,
+    domFile: "",
     outDir: ".",
-    mode: "report",
+    report: false,
+    help: false,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -51,21 +51,16 @@ export function parseArgs(args) {
         result.url = next || "";
         i++;
         break;
-      case "--wait-selector":
-        result.waitSelector = next || "";
-        i++;
-        break;
-      case "--viewport-width":
-        result.viewportWidth = Number(next);
+      case "--dom-file":
+        result.domFile = next || "";
         i++;
         break;
       case "--out":
         result.outDir = next || ".";
         i++;
         break;
-      case "--mode":
-        result.mode = next || "report";
-        i++;
+      case "--report":
+        result.report = true;
         break;
       case "--help":
       case "-h":
@@ -81,7 +76,7 @@ export function parseArgs(args) {
 
 export function printHelp() {
   console.log(`
-Cardshop Figma Validator — compare Figma design vs live page
+Cardshop Figma Validator — Copilot-driven (no browser dependencies)
 
 Usage:
   node src/index.js --figma <FIGMA_LINK> --token <TOKEN> --url <PAGE_URL> [options]
@@ -89,24 +84,28 @@ Usage:
 Required:
   --figma <link>     Figma design URL with ?node-id=...
   --token <token>    Figma personal access token (or FIGMA_TOKEN env)
-  --url <url>        Public page URL to validate
+  --url <url>        Live page URL (Copilot fetches this; used in bundle metadata)
 
 Options:
-  --mode <report|bundle>  Output mode (default: report)
-                          report = report.html + report.json
-                          bundle = Copilot agent bundle (REVIEW.md + snapshots)
-  --wait-selector <css>   Wait for selector before scraping
-  --viewport-width <px>   Browser viewport width (default: 1440)
-  --out <dir>             Output directory (default: .)
-  -h, --help              Show this help
+  --dom-file <path>  Optional dom-snapshot.json from DevTools extract
+  --report           Also write report.html + report.json (requires --dom-file)
+  --out <dir>        Output directory (default: .)
+  -h, --help         Show this help
+
+Copilot workflow (recommended):
+  1. Run this CLI to extract Figma data → bundle/figma-snapshot.json + REVIEW.md
+  2. Copilot fetches the page URL itself OR you provide --dom-file
+  3. Copilot reads REVIEW.md and produces semantic verdict
 
 Examples:
   node src/index.js \\
     --figma "https://www.figma.com/design/abc/Card?node-id=1-2" \\
     --token "$FIGMA_TOKEN" \\
-    --url "https://www.americanexpress.com/au/credit-cards/platinum-card"
+    --url "https://www.example.com/card-page" \\
+    --out bundle
 
-  node src/index.js --mode bundle --out bundle \\
-    --figma "..." --token "$FIGMA_TOKEN" --url "..."
+  node src/index.js \\
+    --figma "..." --token "$FIGMA_TOKEN" --url "..." \\
+    --dom-file dom-snapshot.json --out bundle --report
 `);
 }

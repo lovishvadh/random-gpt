@@ -48,19 +48,20 @@ const naiveFindings = {
   results: [],
 };
 
-test("generateReviewMarkdown includes task rules and data file references", () => {
+test("generateReviewMarkdown with dom file includes naive findings references", () => {
   const md = generateReviewMarkdown({
     meta: {
       figmaLink: "https://figma.com/design/x",
       pageUrl: "https://example.com",
       fileKey: "x",
       nodeId: "1:1",
-      viewportWidth: 1440,
+      frameWidth: 1440,
     },
     figmaElements,
     domElements,
     naiveFindings,
     bundleDir: "/tmp/bundle",
+    hasDomFile: true,
   });
 
   assert.ok(md.includes("# Cardshop Validate — Agent Review Task"));
@@ -68,7 +69,25 @@ test("generateReviewMarkdown includes task rules and data file references", () =
   assert.ok(md.includes("dom-snapshot.json"));
   assert.ok(md.includes("naive-findings.json"));
   assert.ok(md.includes("Match by role + meaning"));
-  assert.ok(md.includes("Confirmed bugs"));
   assert.ok(md.includes("[`hero`]"));
-  assert.ok(md.includes("The Platinum Card"));
+});
+
+test("generateReviewMarkdown without dom file instructs Copilot fetch", () => {
+  const md = generateReviewMarkdown({
+    meta: {
+      figmaLink: "https://figma.com/design/x",
+      pageUrl: "https://example.com",
+      fileKey: "x",
+      nodeId: "1:1",
+      frameWidth: 1440,
+    },
+    figmaElements,
+    domElements: [],
+    naiveFindings,
+    bundleDir: "/tmp/bundle",
+    hasDomFile: false,
+  });
+
+  assert.ok(md.includes("Copilot must fetch the page URL"));
+  assert.ok(md.includes("fetch** tool"));
 });

@@ -1,9 +1,6 @@
 /**
  * @typedef {Object} ValidatorConfig
- * @property {{ width: number, height: number }} viewport
  * @property {{ fontSizePx: number, fontWeight: number, dimensionPct: number, colorExact: boolean }} tolerances
- * @property {string[]} domSelectors
- * @property {{ waitUntil: 'load'|'domcontentloaded'|'networkidle'|'commit', timeoutMs: number }} pageLoad
  * @property {{ html: string, json: string }} output
  */
 
@@ -65,7 +62,7 @@
  * @property {string} pageUrl
  * @property {string} fileKey
  * @property {string} nodeId
- * @property {number} viewportWidth
+ * @property {number | null} [frameWidth]
  */
 
 /**
@@ -75,16 +72,7 @@
  * @property {DomElement[]} domElements
  * @property {ValidationReport} naiveFindings
  * @property {string} bundleDir
- */
-
-/**
- * @typedef {Object} ScrapeOptions
- * @property {number} [viewportWidth]
- * @property {number} [viewportHeight]
- * @property {string} [waitSelector]
- * @property {string[]} [selectors]
- * @property {'load'|'domcontentloaded'|'networkidle'|'commit'} [waitUntil]
- * @property {number} [timeoutMs]
+ * @property {boolean} hasDomFile
  */
 
 /**

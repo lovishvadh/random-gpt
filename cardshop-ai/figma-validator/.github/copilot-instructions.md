@@ -1,45 +1,57 @@
 # Cardshop AI — Copilot instructions
 
-This repo contains tools for the **Cardshop** team at American Express.
+This repo contains **Copilot-driven** tools for the Cardshop team.
 
 ## Figma Validator (`figma-validator/`)
 
-Compares Figma design frames to live Cardshop pages.
+Compares Figma design frames to live Cardshop pages. **Zero npm dependencies. No browser automation in Node.**
 
-### Two modes
+### Architecture
 
-| Mode | Command | Output |
-|------|---------|--------|
-| **report** (default) | `node src/index.js --figma ... --token ... --url ...` | `report.html`, `report.json` |
-| **bundle** (Copilot agent) | `node src/index.js --mode bundle --out bundle ...` | `REVIEW.md`, snapshots, naive findings |
+| Layer | Who | Job |
+|-------|-----|-----|
+| CLI | Node script | Figma REST API → `figma-snapshot.json` + `REVIEW.md` |
+| Page capture | **Copilot** (fetch) or DevTools snippet | Live page content |
+| Judgment | **Copilot** | Semantic match, bug vs drift triage |
 
-### Copilot agent workflow
+### Primary entrypoint
 
-1. User selects **Cardshop Validate** chat mode (`.github/chatmodes/cardshop-validate.chatmode.md`)
-2. Agent runs bundle CLI in terminal
-3. Agent reads `bundle/REVIEW.md` + JSON snapshots
-4. Agent performs semantic matching and triage (bug vs acceptable drift)
+Select **Cardshop Validate** chat mode (`.github/chatmodes/cardshop-validate.chatmode.md`).
+
+### CLI command
+
+```bash
+cd cardshop-ai/figma-validator
+node src/index.js \
+  --figma "<FIGMA_LINK>" \
+  --token "$FIGMA_TOKEN" \
+  --url "<PAGE_URL>" \
+  --out bundle
+```
+
+Optional: `--dom-file dom-snapshot.json --report` for DevTools-extracted DOM with computed styles.
 
 ### Key files
 
-- CLI entry: `figma-validator/src/index.js`
+- CLI: `figma-validator/src/index.js`
+- DevTools extract: `figma-validator/scripts/extract-dom-console.js`
 - Tolerances: `figma-validator/src/config.js`
-- Figma extraction: `figma-validator/src/figmaClient.js` (`sectionPath`, `roleHint`)
-- DOM scraping: `figma-validator/src/domScraper.js` (Playwright)
-- Agent bundle: `figma-validator/src/reviewBundle.js`
+- Figma extraction: `figma-validator/src/figmaClient.js`
+- Bundle generator: `figma-validator/src/reviewBundle.js`
 
 ### Environment
 
 - `FIGMA_TOKEN` — Figma personal access token (or `--token` flag)
-- Node 18+, Playwright Chromium (`npx playwright install chromium`)
+- Node 18+ only — no `npm install` required (zero dependencies)
 
-### Other capabilities in this repo
+### Other capabilities
 
-- `custom-gpt/` — Cardshop Market Guide (registry + Confluence knowledge)
+- `custom-gpt/` — Cardshop Market Guide
 - `foundations/` — markets registry and aqx catalog schemas
 
 ## Guardrails
 
-- Never auto-publish card terms, APR, or legal copy
-- Naive findings are hints; Copilot must reason before calling something a bug
-- No MCP required — agent uses terminal + on-disk bundle
+- Never use Playwright/Chromium
+- Copilot must run CLI before claiming validation
+- Naive findings are hints; Copilot reasons before calling something a bug
+- STRICT on legal/APR/disclosure copy

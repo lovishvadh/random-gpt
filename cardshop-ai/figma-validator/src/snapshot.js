@@ -4,10 +4,9 @@ import { join } from "node:path";
 /**
  * @param {string} outDir
  * @param {import('./types.js').FigmaElement[]} figmaElements
- * @param {import('./types.js').DomElement[]} domElements
  * @param {import('./types.js').BundleMeta} meta
  */
-export async function writeSnapshots(outDir, figmaElements, domElements, meta) {
+export async function writeFigmaSnapshot(outDir, figmaElements, meta) {
   const figmaPayload = {
     generatedAt: new Date().toISOString(),
     meta,
@@ -15,6 +14,17 @@ export async function writeSnapshots(outDir, figmaElements, domElements, meta) {
     elements: figmaElements,
   };
 
+  const figmaPath = join(outDir, "figma-snapshot.json");
+  await writeFile(figmaPath, JSON.stringify(figmaPayload, null, 2), "utf8");
+  return figmaPath;
+}
+
+/**
+ * @param {string} outDir
+ * @param {import('./types.js').DomElement[]} domElements
+ * @param {import('./types.js').BundleMeta} meta
+ */
+export async function writeDomSnapshot(outDir, domElements, meta) {
   const domPayload = {
     generatedAt: new Date().toISOString(),
     meta,
@@ -22,19 +32,7 @@ export async function writeSnapshots(outDir, figmaElements, domElements, meta) {
     elements: domElements,
   };
 
-  await writeFile(
-    join(outDir, "figma-snapshot.json"),
-    JSON.stringify(figmaPayload, null, 2),
-    "utf8"
-  );
-  await writeFile(
-    join(outDir, "dom-snapshot.json"),
-    JSON.stringify(domPayload, null, 2),
-    "utf8"
-  );
-
-  return {
-    figmaPath: join(outDir, "figma-snapshot.json"),
-    domPath: join(outDir, "dom-snapshot.json"),
-  };
+  const domPath = join(outDir, "dom-snapshot.json");
+  await writeFile(domPath, JSON.stringify(domPayload, null, 2), "utf8");
+  return domPath;
 }

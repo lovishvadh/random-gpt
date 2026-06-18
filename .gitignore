@@ -2,10 +2,10 @@ node_modules/
 .env
 *.log
 .DS_Store
+dom-snapshot.json
 
 # Generated validator outputs
 cardshop-ai/figma-validator/report.html
 cardshop-ai/figma-validator/report.json
 cardshop-ai/figma-validator/bundle/
 cardshop-ai/figma-validator/fixtures/output/
-cardshop-ai/figma-validator/.playwright/

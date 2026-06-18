@@ -4,8 +4,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { comparePairs } from "./comparator.js";
 import { config } from "./config.js";
-import { scrapeDomElements } from "./domScraper.js";
 import { fetchFigmaElements, fetchFigmaFrameSize } from "./figmaClient.js";
+import { loadDomFile } from "./loadDomFile.js";
 import { matchElements } from "./matcher.js";
 import { parseFigmaLink } from "./parseFigmaLink.js";
 import { buildReport, renderHtmlReport } from "./reporter.js";
@@ -24,99 +24,120 @@ async function main() {
 
   const { fileKey, nodeId } = parseFigmaLink(args.figma);
   const outDir = resolve(args.outDir);
-  const mode = args.mode === "bundle" ? "bundle" : "report";
 
-  console.log("Cardshop Figma Validator");
-  console.log("------------------------");
-  console.log(`Mode       : ${mode}`);
+  console.log("Cardshop Figma Validator (Copilot-driven)");
+  console.log("-----------------------------------------");
   console.log(`Figma file : ${fileKey}`);
   console.log(`Figma node : ${nodeId}`);
   console.log(`Page URL   : ${args.url}`);
+  console.log(`DOM file   : ${args.domFile || "(none — Copilot will fetch page)"}`);
   console.log("");
 
   const frameSize = await fetchFigmaFrameSize(fileKey, nodeId, args.token);
-  const viewportWidth =
-    args.viewportWidth ?? frameSize?.width ?? config.viewport.width;
+  const frameWidth = frameSize?.width ?? null;
 
-  console.log(`Viewport   : ${viewportWidth}px wide`);
+  if (frameWidth) {
+    console.log(`Frame width: ${frameWidth}px (from Figma)`);
+  }
+
   console.log("Fetching Figma nodes...");
-
   const figmaElements = await fetchFigmaElements(fileKey, nodeId, args.token);
   console.log(`  Found ${figmaElements.length} text nodes in Figma`);
 
-  console.log("Scraping live page (Playwright)...");
-  const domElements = await scrapeDomElements(args.url, {
-    viewportWidth,
-    viewportHeight: config.viewport.height,
-    waitSelector: args.waitSelector || undefined,
-  });
-  console.log(`  Found ${domElements.length} visible text elements on page`);
+  /** @type {import('./types.js').DomElement[]} */
+  let domElements = [];
+  /** @type {import('./types.js').ValidationReport | null} */
+  let naiveFindings = null;
 
-  console.log("Matching and comparing (baseline)...");
-  const pairs = matchElements(figmaElements, domElements);
-  const results = comparePairs(pairs);
+  if (args.domFile) {
+    console.log(`Loading DOM snapshot from ${args.domFile}...`);
+    domElements = await loadDomFile(resolve(args.domFile));
+    console.log(`  Loaded ${domElements.length} DOM elements`);
 
-  const report = buildReport(results, {
+    console.log("Running baseline match + compare...");
+    const pairs = matchElements(figmaElements, domElements);
+    const results = comparePairs(pairs);
+    naiveFindings = buildReport(results, {
+      figmaLink: args.figma,
+      pageUrl: args.url,
+      fileKey,
+      nodeId,
+    });
+
+    console.log(`  Naive FAIL: ${naiveFindings.summary.fail}`);
+    console.log(`  Naive WARN: ${naiveFindings.summary.warn}`);
+    console.log(`  Naive PASS: ${naiveFindings.summary.pass}`);
+  }
+
+  await mkdir(outDir, { recursive: true });
+
+  const meta = {
     figmaLink: args.figma,
     pageUrl: args.url,
     fileKey,
     nodeId,
+    frameWidth,
+  };
+
+  const paths = await writeBundle(outDir, {
+    meta,
+    figmaElements,
+    domElements,
+    naiveFindings: naiveFindings || emptyReport(meta),
+    bundleDir: outDir,
+    hasDomFile: Boolean(args.domFile),
   });
 
-  await mkdir(outDir, { recursive: true });
+  if (args.report) {
+    if (!args.domFile || !naiveFindings) {
+      console.error("--report requires --dom-file");
+      process.exit(1);
+    }
 
-  if (mode === "bundle") {
-    const paths = await writeBundle(outDir, {
-      meta: {
-        figmaLink: args.figma,
-        pageUrl: args.url,
-        fileKey,
-        nodeId,
-        viewportWidth,
-      },
-      figmaElements,
-      domElements,
-      naiveFindings: report,
-      bundleDir: outDir,
-    });
-
+    const htmlPath = join(outDir, config.output.html);
+    const jsonPath = join(outDir, config.output.json);
+    await writeFile(htmlPath, renderHtmlReport(naiveFindings), "utf8");
+    await writeFile(jsonPath, JSON.stringify(naiveFindings, null, 2), "utf8");
     console.log("");
-    console.log("Bundle summary");
-    console.log(`  Figma nodes : ${figmaElements.length}`);
-    console.log(`  DOM nodes   : ${domElements.length}`);
-    console.log(`  Naive FAIL  : ${report.summary.fail}`);
-    console.log(`  Naive WARN  : ${report.summary.warn}`);
-    console.log(`  Naive PASS  : ${report.summary.pass}`);
-    console.log("");
-    console.log("Copilot agent bundle written:");
-    console.log(`  ${paths.reviewPath}`);
-    console.log(`  ${paths.figmaPath}`);
-    console.log(`  ${paths.domPath}`);
-    console.log(`  ${paths.naivePath}`);
-    console.log("");
-    console.log("Next: Open REVIEW.md in Copilot agent mode for semantic triage.");
-
-    process.exit(0);
+    console.log("Report written:");
+    console.log(`  ${htmlPath}`);
+    console.log(`  ${jsonPath}`);
   }
 
-  const htmlPath = join(outDir, config.output.html);
-  const jsonPath = join(outDir, config.output.json);
-
-  await writeFile(htmlPath, renderHtmlReport(report), "utf8");
-  await writeFile(jsonPath, JSON.stringify(report, null, 2), "utf8");
-
   console.log("");
-  console.log("Summary");
-  console.log(`  Total : ${report.summary.total}`);
-  console.log(`  Fail  : ${report.summary.fail}`);
-  console.log(`  Warn  : ${report.summary.warn}`);
-  console.log(`  Pass  : ${report.summary.pass}`);
+  console.log("Bundle written:");
+  console.log(`  ${paths.reviewPath}`);
+  console.log(`  ${paths.figmaPath}`);
+  console.log(`  ${paths.metaPath}`);
+  if (paths.domPath) console.log(`  ${paths.domPath}`);
+  if (paths.naivePath) console.log(`  ${paths.naivePath}`);
   console.log("");
-  console.log("Report written:");
-  console.log(`  ${htmlPath}`);
-  console.log(`  ${jsonPath}`);
+  console.log(
+    args.domFile
+      ? "Next: Open REVIEW.md in Copilot for semantic triage (dom snapshot included)."
+      : "Next: Copilot fetches the page URL and reads REVIEW.md for semantic triage."
+  );
 
-  process.exit(report.summary.fail > 0 ? 1 : 0);
+  process.exit(
+    naiveFindings && naiveFindings.summary.fail > 0 && args.report ? 1 : 0
+  );
+}
+
+/**
+ * @param {import('./types.js').BundleMeta} meta
+ */
+function emptyReport(meta) {
+  return {
+    generatedAt: new Date().toISOString(),
+    meta: {
+      figmaLink: meta.figmaLink,
+      pageUrl: meta.pageUrl,
+      fileKey: meta.fileKey,
+      nodeId: meta.nodeId,
+    },
+    summary: { total: 0, pass: 0, warn: 0, fail: 0 },
+    results: [],
+  };
 }
 
 /**
@@ -131,11 +152,6 @@ function validateInputs(args) {
   if (missing.length > 0) {
     console.error(`Missing required arguments: ${missing.join(", ")}`);
     printHelp();
-    process.exit(1);
-  }
-
-  if (args.mode && !["report", "bundle"].includes(args.mode)) {
-    console.error(`Invalid --mode "${args.mode}". Use "report" or "bundle".`);
     process.exit(1);
   }
 }
